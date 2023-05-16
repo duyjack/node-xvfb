@@ -193,7 +193,7 @@ class Xvfb {
 
 }
 
-export default Xvfb;
+module.exports = Xvfb;
 
 if (require.main === module) {
   var assert = require('assert');
