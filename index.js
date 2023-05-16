@@ -8,34 +8,39 @@ var usleep;
 try {
   usleep = require('sleep').usleep;
 } catch (e) {
-  usleep = function(microsecs) {
+  usleep = function (microsecs) {
     // Fall back to busy loop.
     var deadline = Date.now() + microsecs / 1000;
     while (Date.now() <= deadline);
   };
 }
 
+class Xvfb {
+  _display;
+  _reuse;
+  _timeout;
+  _silent;
+  _xvfb_args;
 
-function Xvfb(options) {
-  options = options || {};
-  this._display = (options.displayNum || options.displayNum === 0 ? ':' + options.displayNum : null);
-  this._reuse = options.reuse;
-  this._timeout = options.timeout || 500;
-  this._silent = options.silent;
-  this._xvfb_args = options.xvfb_args || [];
-}
+  constructor(options) {
+    options = options || {};
+    this._display = (options.displayNum || options.displayNum === 0 ? ':' + options.displayNum : null);
+    this._reuse = options.reuse;
+    this._timeout = options.timeout || 500;
+    this._silent = options.silent;
+    this._xvfb_args = options.xvfb_args || [];
+  }
 
-Xvfb.prototype = {
-  start: function(cb) {
+  start (cb) {
     if (!this._process) {
       var lockFile = this._lockFile();
 
       this._setDisplayEnvVariable();
 
-      fs.exists(lockFile, function(exists) {
+      fs.exists(lockFile, function (exists) {
         var didSpawnFail = false;
         try {
-          this._spawnProcess(exists, function(e) {
+          this._spawnProcess(exists, function (e) {
             didSpawnFail = true;
             if (cb) cb(e);
           });
@@ -45,7 +50,7 @@ Xvfb.prototype = {
 
         var totalTime = 0;
         (function checkIfStarted() {
-          fs.exists(lockFile, function(exists) {
+          fs.exists(lockFile, function (exists) {
             if (didSpawnFail) {
               // When spawn fails, the callback will immediately be called.
               // So we don't have to check whether the lock file exists.
@@ -65,14 +70,14 @@ Xvfb.prototype = {
         }).bind(this)();
       }.bind(this));
     }
-  },
+  }
 
-  startSync: function() {
+  startSync() {
     if (!this._process) {
       var lockFile = this._lockFile();
 
       this._setDisplayEnvVariable();
-      this._spawnProcess(fs.existsSync(lockFile), function(e) {
+      this._spawnProcess(fs.existsSync(lockFile), function (e) {
         // Ignore async spawn error. While usleep is active, tasks on the
         // event loop cannot be executed, so spawn errors will never be
         // received during the startSync call.
@@ -89,9 +94,9 @@ Xvfb.prototype = {
     }
 
     return this._process;
-  },
+  }
 
-  stop: function(cb) {
+  stop (cb) {
     if (this._process) {
       this._killProcess();
       this._restoreDisplayEnvVariable();
@@ -99,7 +104,7 @@ Xvfb.prototype = {
       var lockFile = this._lockFile();
       var totalTime = 0;
       (function checkIfStopped() {
-        fs.exists(lockFile, function(exists) {
+        fs.exists(lockFile, function (exists) {
           if (!exists) {
             return cb && cb(null, this._process);
           } else {
@@ -115,9 +120,9 @@ Xvfb.prototype = {
     } else {
       return cb && cb(null);
     }
-  },
+  }
 
-  stopSync: function() {
+  stopSync () {
     if (this._process) {
       this._killProcess();
       this._restoreDisplayEnvVariable();
@@ -132,9 +137,9 @@ Xvfb.prototype = {
         totalTime += 10;
       }
     }
-  },
+  }
 
-  display: function() {
+  display () {
     if (!this._display) {
       var displayNum = 98;
       var lockFile;
@@ -145,50 +150,50 @@ Xvfb.prototype = {
       this._display = ':' + displayNum;
     }
     return this._display;
-  },
+  }
 
-  _setDisplayEnvVariable: function() {
+  _setDisplayEnvVariable () {
     this._oldDisplay = process.env.DISPLAY;
     process.env.DISPLAY = this.display();
-  },
+  }
 
-  _restoreDisplayEnvVariable: function() {
+  _restoreDisplayEnvVariable () {
     process.env.DISPLAY = this._oldDisplay;
-  },
+  }
 
-  _spawnProcess: function(lockFileExists, onAsyncSpawnError) {
+  _spawnProcess (lockFileExists, onAsyncSpawnError) {
     var display = this.display();
     if (lockFileExists) {
       if (!this._reuse) {
         throw new Error('Display ' + display + ' is already in use and the "reuse" option is false.');
       }
     } else {
-      this._process = spawn('Xvfb', [ display ].concat(this._xvfb_args));
-      this._process.stderr.on('data', function(data) {
+      this._process = spawn('Xvfb', [display].concat(this._xvfb_args));
+      this._process.stderr.on('data', function (data) {
         if (!this._silent) {
           process.stderr.write(data);
         }
       }.bind(this));
       // Bind an error listener to prevent an error from crashing node.
-      this._process.once('error', function(e) {
+      this._process.once('error', function (e) {
         onAsyncSpawnError(e);
       });
     }
-  },
+  }
 
-  _killProcess: function() {
+  _killProcess () {
     this._process.kill();
     this._process = null;
-  },
+  }
 
-  _lockFile: function(displayNum) {
+  _lockFile (displayNum) {
     displayNum = displayNum || this.display().toString().replace(/^:/, '');
     return '/tmp/.X' + displayNum + '-lock';
   }
+
 }
 
-module.exports = Xvfb;
-
+export default Xvfb;
 
 if (require.main === module) {
   var assert = require('assert');
@@ -197,20 +202,20 @@ if (require.main === module) {
   console.error('started sync');
   xvfb.stopSync();
   console.error('stopped sync');
-  xvfb.start(function(err) {
+  xvfb.start(function (err) {
     assert.equal(err, null);
     console.error('started async');
-    xvfb.stop(function(err) {
+    xvfb.stop(function (err) {
       assert.equal(err, null);
       console.error('stopped async');
-      xvfb.start(function(err) {
+      xvfb.start(function (err) {
         assert.equal(err, null);
         console.error('started async');
         xvfb.stopSync();
         console.error('stopped sync');
         xvfb.startSync();
         console.error('started sync');
-        xvfb.stop(function(err) {
+        xvfb.stop(function (err) {
           assert.equal(err, null);
           console.error('stopped async');
         });
